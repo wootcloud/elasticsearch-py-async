@@ -35,6 +35,9 @@ class AIOHttpConnection(Connection):
             host, port, self.url_prefix
         )
 
+    def close(self):
+        return asyncio.ensure_future(self.session.close())
+
     @asyncio.coroutine
     def perform_request(self, method, url, params=None, body=None, timeout=None, ignore=()):
         url_path = url
