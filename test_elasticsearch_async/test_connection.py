@@ -10,12 +10,6 @@ from elasticsearch import NotFoundError
 
 from elasticsearch_async.connection import AIOHttpConnection
 
-@yield_fixture
-def connection(event_loop):
-    connection = AIOHttpConnection()
-    yield connection
-    event_loop.run_until_complete(asyncio.ensure_future(connection.session.close()))
-
 @mark.asyncio
 def test_info(connection):
     status, headers, data = yield from connection.perform_request('GET', '/')
