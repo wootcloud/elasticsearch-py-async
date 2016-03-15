@@ -3,27 +3,39 @@ from pytest import mark, raises
 from elasticsearch import NotFoundError
 
 @mark.asyncio
-def test_info_works(client):
+def test_custom_body(server, client):
+    server.register_response('/', {'custom': 'body'})
     data = yield from client.info()
 
+    assert [('GET', '/', '', {})] == server.calls
+    assert  {'custom': 'body'} == data
+
+@mark.asyncio
+def test_info_works(server, client):
+    data = yield from client.info()
+
+    assert [('GET', '/', '', {})] == server.calls
     assert  {'body': '', 'method': 'GET', 'params': {}, 'path': '/'} == data
 
 @mark.asyncio
-def test_ping_works(client):
+def test_ping_works(server, client):
     data = yield from client.ping()
 
+    assert [('HEAD', '/', '', {})] == server.calls
     assert data is True
 
 @mark.asyncio
-def test_exists_with_404_returns_false(client):
-    data = yield from client.indices.exists(index='not-there', params={'status': 404})
+def test_exists_with_404_returns_false(server, client):
+    server.register_response('/not-there', status=404)
+    data = yield from client.indices.exists(index='not-there')
 
     assert data is False
 
 @mark.asyncio
-def test_404_properly_raised(client):
+def test_404_properly_raised(server, client):
+    server.register_response('/i/t/42', status=404)
     with raises(NotFoundError):
-        yield from client.get(index='not-there', doc_type='t', id=42, params={'status': 404})
+        yield from client.get(index='i', doc_type='t', id=42)
 
 @mark.asyncio
 def test_body_gets_passed_properly(client):

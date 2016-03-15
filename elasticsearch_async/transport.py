@@ -1,13 +1,100 @@
 import asyncio
+import time
+import logging
+from itertools import chain
 
 from elasticsearch import Transport, TransportError, ConnectionTimeout, ConnectionError
 
 from .connection import AIOHttpConnection
 
+logger = logging.getLogger('elasticsearch')
+
 class AsyncTransport(Transport):
-    def __init__(self, hosts, connection_class=AIOHttpConnection, **kwargs):
+    def __init__(self, hosts, connection_class=AIOHttpConnection, loop=None, sniff_on_start=False, **kwargs):
         # TODO: if sniff_on_start, pass False to super and call our coroutine directly
-        super().__init__(hosts, connection_class=connection_class, **kwargs)
+        self.loop = asyncio.get_event_loop() if loop is None else loop
+        kwargs['loop'] = self.loop
+        super().__init__(hosts, connection_class=connection_class, sniff_on_start=False, **kwargs)
+        if sniff_on_start:
+            # schedule sniff on start
+            self.loop.create_task(self.sniff_hosts(True))
+
+    def get_connection(self):
+        if self.sniffer_timeout:
+            if time.time() >= self.last_sniff + self.sniffer_timeout:
+                self.loop.create_task(self.sniff_hosts())
+        return self.connection_pool.get_connection()
+
+    def mark_dead(self, connection):
+        self.connection_pool.mark_dead(connection)
+        if self.sniff_on_connection_fail:
+            self.loop.create_task(self.sniff_hosts())
+
+    @asyncio.coroutine
+    def _get_sniff_data(self, initial=False):
+        previous_sniff = self.last_sniff
+
+        # reset last_sniff timestamp
+        self.last_sniff = time.time()
+
+        # use small timeout for the sniffing request, should be a fast api call
+        timeout = self.sniff_timeout if not initial else None
+
+        tasks = [
+            c.perform_request('GET', '/_nodes/_all/clear', timeout=timeout)
+            # go through all current connections as well as the
+            # seed_connections for good measure
+            for c in chain(self.connection_pool.connections, (c for c in self.seed_connections if c not in self.connection_pool.connections))
+        ]
+
+        done = ()
+        pending = tasks
+        try:
+            # execute sniff requests in parallel, wait for first to return
+            # TODO: do it in batches
+            done, pending = yield from asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED, loop=self.loop)
+            _, headers, node_info = done.pop().result()
+            node_info = self.deserializer.loads(node_info, headers.get('content-type'))
+            return list(node_info['nodes'].values())
+        except Exception as e:
+            # keep the previous value on error
+            self.last_sniff = previous_sniff
+            logger.warn('Sniffing failed with %r', e)
+            raise
+        finally:
+            # clean up pending futures
+            for t in done:
+                t.result()
+            for t in pending:
+                t.cancel()
+
+    @asyncio.coroutine
+    def sniff_hosts(self, initial=False):
+        """
+        Obtain a list of nodes from the cluster and create a new connection
+        pool using the information retrieved.
+
+        To extract the node connection parameters use the ``nodes_to_host_callback``.
+
+        :arg initial: flag indicating if this is during startup
+            (``sniff_on_start``), ignore the ``sniff_timeout`` if ``True``
+        """
+        node_info = yield from self._get_sniff_data(initial)
+
+        hosts = list(filter(None, (self._get_host_info(n) for n in node_info)))
+
+        # we weren't able to get any nodes, maybe using an incompatible
+        # transport_schema or host_info_callback blocked all - raise error.
+        if not hosts:
+            raise TransportError("N/A", "Unable to sniff hosts - no viable hosts found.")
+
+        # remember current live connections
+        orig_connections = self.connection_pool.connections[:]
+        self.set_connections(hosts)
+        # close those connections that are not in use any more
+        for c in orig_connections:
+            if c not in self.connection_pool.connections:
+                c.close()
 
     @asyncio.coroutine
     def main_loop(self, method, url, params, body, ignore=(), timeout=None):
@@ -16,7 +103,7 @@ class AsyncTransport(Transport):
 
             try:
                 status, headers, data = yield from connection.perform_request(
-                    method, url, params, body, ignore=ignore, timeout=timeout)
+                        method, url, params, body, ignore=ignore, timeout=timeout)
             except TransportError as e:
                 if method == 'HEAD' and e.status_code == 404:
                     return False
@@ -80,6 +167,7 @@ class AsyncTransport(Transport):
             if isinstance(ignore, int):
                 ignore = (ignore, )
 
-        return asyncio.ensure_future(self.main_loop(method, url, params, body,
+        return self.loop.create_task(self.main_loop(method, url, params, body,
                                                     ignore=ignore,
                                                     timeout=timeout))
+
