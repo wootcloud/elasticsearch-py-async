@@ -6,7 +6,7 @@ from elasticsearch import NotFoundError
 def test_info_works(client):
     data = yield from client.info()
 
-    assert data['tagline'] == 'You Know, for Search'
+    assert  {'body': '', 'method': 'GET', 'params': {}, 'path': '/'} == data
 
 @mark.asyncio
 def test_ping_works(client):
@@ -16,31 +16,21 @@ def test_ping_works(client):
 
 @mark.asyncio
 def test_exists_with_404_returns_false(client):
-    data = yield from client.indices.exists(index='not-there')
+    data = yield from client.indices.exists(index='not-there', params={'status': 404})
 
     assert data is False
 
 @mark.asyncio
 def test_404_properly_raised(client):
     with raises(NotFoundError):
-        yield from client.get(index='not-there', doc_type='t', id=42)
+        yield from client.get(index='not-there', doc_type='t', id=42, params={'status': 404})
 
 @mark.asyncio
-def test_params_and_body_get_passed_properly(client):
-    response = {
-        'tokens': [
-            {
-                'end_offset': 12,
-                'position': 0,
-                'start_offset': 0,
-                'token': 'Hello World!',
-                'type': 'word'
-            }
-        ]
-    }
+def test_body_gets_passed_properly(client):
+    data = yield from client.index(index='i', doc_type='t', id='42', body={'some': 'data'})
+    assert  {'body': {'some': 'data'}, 'method': 'PUT', 'params': {}, 'path': '/i/t/42'} == data
 
-    data = yield from client.indices.analyze(body={'analyzer': 'keyword', 'text': 'Hello World!'})
-    assert data == response
-
-    data = yield from client.indices.analyze(**{'analyzer': 'keyword', 'text': 'Hello World!'})
-    assert data == response
+@mark.asyncio
+def test_params_get_passed_properly(client):
+    data = yield from client.info(params={'some': 'data'})
+    assert  {'body': '', 'method': 'GET', 'params': {'some': 'data'}, 'path': '/'} == data

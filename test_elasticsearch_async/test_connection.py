@@ -17,7 +17,7 @@ def test_info(connection):
     data = json.loads(data)
 
     assert status == 200
-    assert data['tagline'] == "You Know, for Search"
+    assert  {'body': '', 'method': 'GET', 'params': {}, 'path': '/'} == data
 
 def test_auth_is_set_correctly():
     connection = AIOHttpConnection(http_auth=('user', 'secret'))
@@ -27,27 +27,26 @@ def test_auth_is_set_correctly():
     assert connection.session._default_auth == aiohttp.BasicAuth('user', 'secret')
 
 @mark.asyncio
-def test_request_is_properly_logged(connection, caplog):
+def test_request_is_properly_logged(connection, caplog, port):
     yield from connection.perform_request('GET', '/_cat/indices', body=b'{}', params={"format": "json"})
 
     for logger, level, message in caplog.record_tuples:
         if logger == 'elasticsearch' and level == logging.INFO:
-            assert message.startswith('GET http://localhost:9200/_cat/indices?format=json [status:200 request:')
+            assert message.startswith('GET http://localhost:%s/_cat/indices?format=json [status:200 request:' % port)
             break
     else:
         assert False, 'Message not found'
 
     assert ('elasticsearch', logging.DEBUG, '> {}') in caplog.record_tuples
-    assert ('elasticsearch', logging.DEBUG, '< []') in caplog.record_tuples
 
 @mark.asyncio
-def test_error_is_properly_logged(connection, caplog):
+def test_error_is_properly_logged(connection, caplog, port):
     with raises(NotFoundError):
-        yield from connection.perform_request('GET', '/not-here', params={"some": "data"})
+        yield from connection.perform_request('GET', '/not-here', params={'status': 404})
 
     for logger, level, message in caplog.record_tuples:
         if logger == 'elasticsearch' and level == logging.WARNING:
-            assert message.startswith('GET http://localhost:9200/not-here?some=data [status:404 request:')
+            assert message.startswith('GET http://localhost:%s/not-here?status=404 [status:404 request:' % port)
             break
     else:
         assert False, "Log not received"
