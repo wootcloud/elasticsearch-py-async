@@ -6,6 +6,7 @@ from itertools import chain
 from elasticsearch import Transport, TransportError, ConnectionTimeout, ConnectionError
 
 from .connection import AIOHttpConnection
+from .helpers import ensure_future
 
 logger = logging.getLogger('elasticsearch')
 
@@ -17,18 +18,18 @@ class AsyncTransport(Transport):
         super().__init__(hosts, connection_class=connection_class, sniff_on_start=False, **kwargs)
         if sniff_on_start:
             # schedule sniff on start
-            self.loop.create_task(self.sniff_hosts(True))
+            ensure_future(self.sniff_hosts(True), loop=self.loop)
 
     def get_connection(self):
         if self.sniffer_timeout:
             if time.time() >= self.last_sniff + self.sniffer_timeout:
-                self.loop.create_task(self.sniff_hosts())
+                ensure_future(self.sniff_hosts(), loop=self.loop)
         return self.connection_pool.get_connection()
 
     def mark_dead(self, connection):
         self.connection_pool.mark_dead(connection)
         if self.sniff_on_connection_fail:
-            self.loop.create_task(self.sniff_hosts())
+            ensure_future(self.sniff_hosts(), loop=self.loop)
 
     @asyncio.coroutine
     def _get_sniff_data(self, initial=False):
@@ -167,7 +168,8 @@ class AsyncTransport(Transport):
             if isinstance(ignore, int):
                 ignore = (ignore, )
 
-        return self.loop.create_task(self.main_loop(method, url, params, body,
+        return ensure_future(self.main_loop(method, url, params, body,
                                                     ignore=ignore,
-                                                    timeout=timeout))
+                                                    timeout=timeout),
+                             loop=self.loop)
 

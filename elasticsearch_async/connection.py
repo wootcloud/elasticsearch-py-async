@@ -7,6 +7,8 @@ from elasticsearch.exceptions import ConnectionError, ConnectionTimeout, SSLErro
 from elasticsearch.connection import Connection
 from elasticsearch.compat import urlencode
 
+from .helpers import ensure_future
+
 class AIOHttpConnection(Connection):
     def __init__(self, host='localhost', port=9200, http_auth=None,
             use_ssl=False, verify_certs=False, ca_certs=None, client_cert=None,
@@ -38,7 +40,7 @@ class AIOHttpConnection(Connection):
         )
 
     def close(self):
-        return asyncio.ensure_future(self.session.close())
+        return ensure_future(self.session.close())
 
     @asyncio.coroutine
     def perform_request(self, method, url, params=None, body=None, timeout=None, ignore=()):
