@@ -38,6 +38,11 @@ class AsyncTransport(Transport):
         if self.sniffing_task is None:
             self.sniffing_task = ensure_future(self.sniff_hosts(initial), loop=self.loop)
 
+    def close(self):
+        if self.sniffing_task:
+            self.sniffing_task.cancel()
+        super().close()
+
     def get_connection(self):
         if self.sniffer_timeout:
             if time.time() >= self.last_sniff + self.sniffer_timeout:
