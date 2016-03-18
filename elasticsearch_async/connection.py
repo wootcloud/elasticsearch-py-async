@@ -1,5 +1,4 @@
 import asyncio
-import time
 
 import aiohttp
 from aiohttp.errors import FingerprintMismatch, ClientError
@@ -48,23 +47,23 @@ class AIOHttpConnection(Connection):
             url_path = '%s?%s' % (url, urlencode(params or {}))
         url = self.base_url + url_path
 
-        start = time.time()
+        start = self.loop.time()
         response = None
         try:
             response = yield from asyncio.wait_for(self.session.request(method, url, data=body), timeout or self.timeout)
             raw_data = yield from response.text()
-            duration = time.time() - start
+            duration = self.loop.time() - start
 
         except asyncio.TimeoutError as e:
-            self.log_request_fail(method, url, body, time.time() - start, exception=e)
+            self.log_request_fail(method, url, body, self.loop.time() - start, exception=e)
             raise ConnectionTimeout('TIMEOUT', str(e), e)
 
         except FingerprintMismatch as e:
-            self.log_request_fail(method, url, body, time.time() - start, exception=e)
+            self.log_request_fail(method, url, body, self.loop.time() - start, exception=e)
             raise SSLError('N/A', str(e), e)
 
         except ClientError as e:
-            self.log_request_fail(method, url, body, time.time() - start, exception=e)
+            self.log_request_fail(method, url, body, self.loop.time() - start, exception=e)
             raise ConnectionError('N/A', str(e), e)
 
         finally:
