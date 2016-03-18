@@ -50,8 +50,9 @@ class AIOHttpConnection(Connection):
         start = self.loop.time()
         response = None
         try:
-            response = yield from asyncio.wait_for(self.session.request(method, url, data=body), timeout or self.timeout)
-            raw_data = yield from response.text()
+            with aiohttp.Timeout(timeout or self.timeout):
+                response = yield from self.session.request(method, url, data=body)
+                raw_data = yield from response.text()
             duration = self.loop.time() - start
 
         except asyncio.TimeoutError as e:

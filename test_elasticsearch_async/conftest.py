@@ -37,6 +37,8 @@ class DummyElasticsearch(ServerHttpProtocol):
 
         if url.path in self._responses:
             status, body = self._responses.pop(url.path)
+            if asyncio.iscoroutine(body):
+                body = yield from body
         else:
             status = 200
             body = {

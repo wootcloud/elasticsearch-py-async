@@ -6,7 +6,7 @@ import aiohttp
 
 from pytest import mark, yield_fixture, raises
 
-from elasticsearch import NotFoundError
+from elasticsearch import NotFoundError, ConnectionTimeout
 
 from elasticsearch_async.connection import AIOHttpConnection
 
@@ -53,3 +53,14 @@ def test_error_is_properly_logged(connection, caplog, port, server):
             break
     else:
         assert False, "Log not received"
+
+@mark.asyncio
+def test_timeout_is_properly_raised(connection, server):
+    @asyncio.coroutine
+    def slow_request():
+        yield from asyncio.sleep(0.01)
+        return {}
+    server.register_response('/_search', slow_request())
+
+    with raises(ConnectionTimeout):
+        yield from connection.perform_request('GET', '/_search', timeout=0.0001)
