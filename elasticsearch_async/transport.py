@@ -16,20 +16,38 @@ class AsyncTransport(Transport):
         self.loop = asyncio.get_event_loop() if loop is None else loop
         kwargs['loop'] = self.loop
         super().__init__(hosts, connection_class=connection_class, sniff_on_start=False, **kwargs)
+
+        self.sniffing_task = None
         if sniff_on_start:
             # schedule sniff on start
-            ensure_future(self.sniff_hosts(True), loop=self.loop)
+            self.initiate_sniff(True)
+
+    def initiate_sniff(self, initial=False):
+        """
+        Initiate a sniffing task. Make sure we only have one sniff request
+        running at any given time. If a finished sniffing request is around,
+        collect its result (which can raise its exception).
+        """
+        if self.sniffing_task and self.sniffing_task.done():
+            try:
+                if self.sniffing_task is not None:
+                    self.sniffing_task.result()
+            finally:
+                self.sniffing_task = None
+
+        if self.sniffing_task is None:
+            self.sniffing_task = ensure_future(self.sniff_hosts(initial), loop=self.loop)
 
     def get_connection(self):
         if self.sniffer_timeout:
             if time.time() >= self.last_sniff + self.sniffer_timeout:
-                ensure_future(self.sniff_hosts(), loop=self.loop)
+                self.initiate_sniff()
         return self.connection_pool.get_connection()
 
     def mark_dead(self, connection):
         self.connection_pool.mark_dead(connection)
         if self.sniff_on_connection_fail:
-            ensure_future(self.sniff_hosts(), loop=self.loop)
+            self.initiate_sniff()
 
     @asyncio.coroutine
     def _get_sniff_data(self, initial=False):
