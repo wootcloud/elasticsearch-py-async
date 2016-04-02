@@ -3,7 +3,7 @@ import time
 import logging
 from itertools import chain
 
-from elasticsearch import Transport, TransportError, ConnectionTimeout, ConnectionError
+from elasticsearch import Transport, TransportError, ConnectionTimeout, ConnectionError, SerializationError
 
 from .connection import AIOHttpConnection
 from .helpers import ensure_future
@@ -72,24 +72,30 @@ class AsyncTransport(Transport):
         ]
 
         done = ()
-        pending = tasks
         try:
-            # execute sniff requests in parallel, wait for first to return
-            # TODO: do it in batches
-            done, pending = yield from asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED, loop=self.loop)
-            _, headers, node_info = done.pop().result()
-            node_info = self.deserializer.loads(node_info, headers.get('content-type'))
-            return list(node_info['nodes'].values())
-        except Exception as e:
+            while tasks:
+                # execute sniff requests in parallel, wait for first to return
+                done, tasks = yield from asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED, loop=self.loop)
+                # go through all the finished tasks
+                for t in done:
+                    try:
+                        _, headers, node_info = t.result()
+                        node_info = self.deserializer.loads(node_info, headers.get('content-type'))
+                    except (ConnectionError, SerializationError) as e:
+                        logger.warn('Sniffing request failed with %r', e)
+                        continue
+                    node_info = list(node_info['nodes'].values())
+                    return node_info
+            else:
+                # no task has finished completely
+                raise TransportError("N/A", "Unable to sniff hosts.")
+        except:
             # keep the previous value on error
             self.last_sniff = previous_sniff
-            logger.warn('Sniffing failed with %r', e)
             raise
         finally:
             # clean up pending futures
-            for t in done:
-                t.result()
-            for t in pending:
+            for t in chain(done, tasks):
                 t.cancel()
 
     @asyncio.coroutine
