@@ -11,8 +11,9 @@ from .helpers import ensure_future
 logger = logging.getLogger('elasticsearch')
 
 class AsyncTransport(Transport):
-    def __init__(self, hosts, connection_class=AIOHttpConnection, loop=None, sniff_on_start=False, **kwargs):
-        # TODO: if sniff_on_start, pass False to super and call our coroutine directly
+    def __init__(self, hosts, connection_class=AIOHttpConnection, loop=None,
+                 sniff_on_start=False, raise_on_sniff_error=True, **kwargs):
+        self.raise_on_sniff_error = raise_on_sniff_error
         self.loop = asyncio.get_event_loop() if loop is None else loop
         kwargs['loop'] = self.loop
         super().__init__(hosts, connection_class=connection_class, sniff_on_start=False, **kwargs)
@@ -32,6 +33,9 @@ class AsyncTransport(Transport):
             try:
                 if self.sniffing_task is not None:
                     self.sniffing_task.result()
+            except:
+                if self.raise_on_sniff_error:
+                    raise
             finally:
                 self.sniffing_task = None
 
