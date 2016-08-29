@@ -28,14 +28,15 @@ Example::
 used to pass in an event loop you wish the client to use. By default
 ``asyncio.get_event_loop()`` will be used.
 
-
-.. note::
-
-    Currently this library is experimental and requires ``elasticsearch-py``
-    from branch ``async``.
-
 .. _elasticsearch-py: http://elasticsearch-py.rtfd.org/
 .. _asyncio: https://docs.python.org/3/library/asyncio.html
+
+Installation
+------------
+
+``elasticsearch-async`` is available via PyPI so you can install it using pip::
+
+    pip install elasticsearch-async
 
 License
 -------
