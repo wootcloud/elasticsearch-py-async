@@ -58,15 +58,15 @@ class AIOHttpConnection(Connection):
             duration = self.loop.time() - start
 
         except asyncio.TimeoutError as e:
-            self.log_request_fail(method, url, body, self.loop.time() - start, exception=e)
+            self.log_request_fail(method, url, url_path, body, self.loop.time() - start, exception=e)
             raise ConnectionTimeout('TIMEOUT', str(e), e)
 
         except FingerprintMismatch as e:
-            self.log_request_fail(method, url, body, self.loop.time() - start, exception=e)
+            self.log_request_fail(method, url, url_path, body, self.loop.time() - start, exception=e)
             raise SSLError('N/A', str(e), e)
 
         except ClientError as e:
-            self.log_request_fail(method, url, body, self.loop.time() - start, exception=e)
+            self.log_request_fail(method, url, url_path, body, self.loop.time() - start, exception=e)
             raise ConnectionError('N/A', str(e), e)
 
         finally:
@@ -75,7 +75,7 @@ class AIOHttpConnection(Connection):
 
         # raise errors based on http status codes, let the client handle those if needed
         if not (200 <= response.status < 300) and response.status not in ignore:
-            self.log_request_fail(method, url, body, duration, response.status, raw_data)
+            self.log_request_fail(method, url, url_path, body, duration, status_code=response.status, response=raw_data)
             self._raise_error(response.status, raw_data)
 
         self.log_request_success(method, url, url_path, body, response.status, raw_data, duration)
