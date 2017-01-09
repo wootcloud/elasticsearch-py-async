@@ -2,7 +2,7 @@
 from os.path import join, dirname
 from setuptools import setup, find_packages
 
-VERSION = (1, 0, 0)
+VERSION = (5, 0, 0)
 __version__ = VERSION
 __versionstr__ = '.'.join(map(str, VERSION))
 
@@ -12,7 +12,7 @@ f.close()
 
 install_requires = [
     'aiohttp',
-    'elasticsearch>=2.4.0',
+    'elasticsearch>=5.0.0',
 ]
 
 tests_require = [
