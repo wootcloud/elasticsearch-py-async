@@ -69,7 +69,7 @@ class AsyncTransport(Transport):
         timeout = self.sniff_timeout if not initial else None
 
         tasks = [
-            c.perform_request('GET', '/_nodes/_all/clear', timeout=timeout)
+            c.perform_request('GET', '/_nodes/_all/http', timeout=timeout)
             # go through all current connections as well as the
             # seed_connections for good measure
             for c in chain(self.connection_pool.connections, (c for c in self.seed_connections if c not in self.connection_pool.connections))

@@ -6,7 +6,7 @@ from elasticsearch_async import AsyncElasticsearch
 
 @mark.asyncio
 def test_sniff_on_start_sniffs(server, event_loop, port, sniff_data):
-    server.register_response('/_nodes/_all/clear', sniff_data)
+    server.register_response('/_nodes/_all/http', sniff_data)
 
     client = AsyncElasticsearch(port=port, sniff_on_start=True, loop=event_loop)
 
@@ -14,7 +14,7 @@ def test_sniff_on_start_sniffs(server, event_loop, port, sniff_data):
     assert client.transport.sniffing_task is not None
     yield from client.transport.sniffing_task
 
-    assert [('GET', '/_nodes/_all/clear', '', {})] == server.calls
+    assert [('GET', '/_nodes/_all/http', '', {})] == server.calls
     connections = client.transport.connection_pool.connections
 
     assert 1 == len(connections)

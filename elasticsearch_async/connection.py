@@ -57,16 +57,12 @@ class AIOHttpConnection(Connection):
                 raw_data = yield from response.text()
             duration = self.loop.time() - start
 
-        except asyncio.TimeoutError as e:
+        except Exception as e:
             self.log_request_fail(method, url, url_path, body, self.loop.time() - start, exception=e)
-            raise ConnectionTimeout('TIMEOUT', str(e), e)
-
-        except FingerprintMismatch as e:
-            self.log_request_fail(method, url, url_path, body, self.loop.time() - start, exception=e)
-            raise SSLError('N/A', str(e), e)
-
-        except ClientError as e:
-            self.log_request_fail(method, url, url_path, body, self.loop.time() - start, exception=e)
+            if isinstance(e, FingerprintMismatch):
+                raise SSLError('N/A', str(e), e)
+            if isinstance(e, asyncio.TimeoutError):
+                raise ConnectionTimeout('TIMEOUT', str(e), e)
             raise ConnectionError('N/A', str(e), e)
 
         finally:

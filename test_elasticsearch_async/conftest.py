@@ -88,7 +88,11 @@ def sniff_data():
                 "ip": "127.0.0.1",
                 "version": "2.1.0",
                 "build": "72cd1f1",
-                "http_address": "node1/127.0.0.1:9200",
+                "http" : {
+                    "bound_address" : [ "[fe80::1]:9200", "[::1]:9200", "127.0.0.1:9200" ],
+                    "publish_address" : "node1:9200",
+                    "max_content_length_in_bytes" : 104857600
+                },
                 "attributes": {
                     "testattr": "test"
                 }
