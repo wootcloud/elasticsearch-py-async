@@ -19,11 +19,11 @@ def test_info(connection):
     assert status == 200
     assert  {'body': '', 'method': 'GET', 'params': {}, 'path': '/'} == data
 
-def test_auth_is_set_correctly():
-    connection = AIOHttpConnection(http_auth=('user', 'secret'))
+def test_auth_is_set_correctly(event_loop):
+    connection = AIOHttpConnection(http_auth=('user', 'secret'), loop=event_loop)
     assert connection.session._default_auth == aiohttp.BasicAuth('user', 'secret')
 
-    connection = AIOHttpConnection(http_auth='user:secret')
+    connection = AIOHttpConnection(http_auth='user:secret', loop=event_loop)
     assert connection.session._default_auth == aiohttp.BasicAuth('user', 'secret')
 
 @mark.asyncio
