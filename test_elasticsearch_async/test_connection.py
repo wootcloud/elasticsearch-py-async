@@ -64,3 +64,13 @@ def test_timeout_is_properly_raised(connection, server):
 
     with raises(ConnectionTimeout):
         yield from connection.perform_request('GET', '/_search', timeout=0.0001)
+
+
+def test_dns_cache_is_enabled_by_default(event_loop):
+    connection = AIOHttpConnection(loop=event_loop)
+    assert connection.session.connector.use_dns_cache is True
+
+
+def test_dns_cache_can_be_disabled(event_loop):
+    connection = AIOHttpConnection(loop=event_loop, use_dns_cache=False)
+    assert connection.session.connector.use_dns_cache is False
