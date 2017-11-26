@@ -11,7 +11,7 @@ from elasticsearch.compat import urlencode
 class AIOHttpConnection(Connection):
     def __init__(self, host='localhost', port=9200, http_auth=None,
             use_ssl=False, verify_certs=False, ca_certs=None, client_cert=None,
-            client_key=None, loop=None, use_dns_cache=True, **kwargs):
+            client_key=None, loop=None, use_dns_cache=True, headers=None, **kwargs):
         super().__init__(host=host, port=port, **kwargs)
 
         self.loop = asyncio.get_event_loop() if loop is None else loop
@@ -23,6 +23,9 @@ class AIOHttpConnection(Connection):
             if isinstance(http_auth, (tuple, list)):
                 http_auth = aiohttp.BasicAuth(*http_auth)
 
+        headers = headers or {}
+        headers.setdefault('content-type', 'application/json')
+
         self.session = aiohttp.ClientSession(
             auth=http_auth,
             conn_timeout=self.timeout,
@@ -30,7 +33,8 @@ class AIOHttpConnection(Connection):
                 loop=self.loop,
                 verify_ssl=verify_certs,
                 use_dns_cache=use_dns_cache,
-            )
+            ),
+            headers=headers
         )
 
         self.base_url = 'http%s://%s:%d%s' % (
@@ -42,7 +46,7 @@ class AIOHttpConnection(Connection):
         return self.session.close()
 
     @asyncio.coroutine
-    def perform_request(self, method, url, params=None, body=None, timeout=None, ignore=()):
+    def perform_request(self, method, url, params=None, body=None, timeout=None, ignore=(), headers=None):
         url_path = url
         if params:
             url_path = '%s?%s' % (url, urlencode(params or {}))
@@ -52,7 +56,7 @@ class AIOHttpConnection(Connection):
         response = None
         try:
             with aiohttp.Timeout(timeout or self.timeout):
-                response = yield from self.session.request(method, url, data=body)
+                response = yield from self.session.request(method, url, data=body, headers=headers)
                 raw_data = yield from response.text()
             duration = self.loop.time() - start
 
