@@ -6,12 +6,14 @@ from aiohttp.client_exceptions import ServerFingerprintMismatch
 from elasticsearch.exceptions import ConnectionError, ConnectionTimeout, SSLError
 from elasticsearch.connection import Connection
 from elasticsearch.compat import urlencode
+from elasticsearch.connection.http_urllib3 import create_ssl_context
 
 
 class AIOHttpConnection(Connection):
     def __init__(self, host='localhost', port=9200, http_auth=None,
             use_ssl=False, verify_certs=False, ca_certs=None, client_cert=None,
-            client_key=None, loop=None, use_dns_cache=True, headers=None, **kwargs):
+            client_key=None, loop=None, use_dns_cache=True, headers=None,
+            ssl_context=None, **kwargs):
         super().__init__(host=host, port=port, **kwargs)
 
         self.loop = asyncio.get_event_loop() if loop is None else loop
@@ -26,6 +28,35 @@ class AIOHttpConnection(Connection):
         headers = headers or {}
         headers.setdefault('content-type', 'application/json')
 
+        # if providing an SSL context, raise error if any other SSL related flag is used
+        if ssl_context and (verify_certs or ca_certs or ssl_version):
+            raise ImproperlyConfigured("When using `ssl_context`, `use_ssl`, `verify_certs`, `ca_certs` and `ssl_version` are not permitted")
+
+        if use_ssl or ssl_context:
+            cafile = CA_CERTS if ca_certs is None else ca_certs
+            if not cafile and not ssl_context and verify_certs:
+                # If no ca_certs and no sslcontext passed and asking to verify certs
+                # raise error
+                raise ImproperlyConfigured("Root certificates are missing for certificate "
+                    "validation. Either pass them in using the ca_certs parameter or "
+                    "install certifi to use it automatically.")
+            if verify_certs or ca_certs or ssl_version:
+                warnings.warn('Use of `verify_certs`, `ca_certs`, `ssl_version` have been deprecated in favor of using SSLContext`', DeprecationWarning)
+
+            if not ssl_context:
+                # if SSLContext hasn't been passed in, create one.
+                # need to skip if sslContext isn't avail
+                try:
+                    ssl_context = create_ssl_context(cafile=cafile)
+                except AttributeError:
+                    ssl_context = None
+
+                if not verify_certs and ssl_context is not None:
+                    ssl_context.check_hostname = False
+                    ssl_context.verify_mode = ssl.CERT_NONE
+                    warnings.warn(
+                        'Connecting to %s using SSL with verify_certs=False is insecure.' % host)
+
         self.session = aiohttp.ClientSession(
             auth=http_auth,
             conn_timeout=self.timeout,
@@ -33,6 +64,7 @@ class AIOHttpConnection(Connection):
                 loop=self.loop,
                 verify_ssl=verify_certs,
                 use_dns_cache=use_dns_cache,
+                ssl_context=ssl_context,
             ),
             headers=headers
         )
