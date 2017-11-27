@@ -29,19 +29,19 @@ class AIOHttpConnection(Connection):
         headers.setdefault('content-type', 'application/json')
 
         # if providing an SSL context, raise error if any other SSL related flag is used
-        if ssl_context and (verify_certs or ca_certs or ssl_version):
-            raise ImproperlyConfigured("When using `ssl_context`, `use_ssl`, `verify_certs`, `ca_certs` and `ssl_version` are not permitted")
+        if ssl_context and (verify_certs or ca_certs):
+            raise ImproperlyConfigured("When using `ssl_context`, `use_ssl`, `verify_certs`, `ca_certs` are not permitted")
 
         if use_ssl or ssl_context:
-            cafile = CA_CERTS if ca_certs is None else ca_certs
+            cafile = ca_certs
             if not cafile and not ssl_context and verify_certs:
                 # If no ca_certs and no sslcontext passed and asking to verify certs
                 # raise error
                 raise ImproperlyConfigured("Root certificates are missing for certificate "
                     "validation. Either pass them in using the ca_certs parameter or "
                     "install certifi to use it automatically.")
-            if verify_certs or ca_certs or ssl_version:
-                warnings.warn('Use of `verify_certs`, `ca_certs`, `ssl_version` have been deprecated in favor of using SSLContext`', DeprecationWarning)
+            if verify_certs or ca_certs:
+                warnings.warn('Use of `verify_certs`, `ca_certs` have been deprecated in favor of using SSLContext`', DeprecationWarning)
 
             if not ssl_context:
                 # if SSLContext hasn't been passed in, create one.
@@ -56,6 +56,9 @@ class AIOHttpConnection(Connection):
                     ssl_context.verify_mode = ssl.CERT_NONE
                     warnings.warn(
                         'Connecting to %s using SSL with verify_certs=False is insecure.' % host)
+            if ssl_context:
+                verify_certs = True
+                use_ssl = True
 
         self.session = aiohttp.ClientSession(
             auth=http_auth,
