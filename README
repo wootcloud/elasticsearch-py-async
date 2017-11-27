@@ -33,7 +33,6 @@ Example with SSL Context::
 
     context = create_ssl_context(cafile="/certs/ca/ca.crt")
 
-
     client = AsyncElasticsearch(
         hosts=['elasticsearch-xpack'],
         ssl_context=context,
@@ -45,10 +44,10 @@ Example with SSL Context::
         info = yield from client.info()
         print(info)
 
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(print_info())
-        loop.close()
-        client.transport.close()
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(print_info())
+    loop.close()
+    client.transport.close()
 
 
 
