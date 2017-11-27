@@ -24,6 +24,34 @@ Example::
     loop.close()
     client.transport.close()
 
+
+Example with SSL Context::
+
+    import asyncio
+    from elasticsearch_async import AsyncElasticsearch
+    from elasticsearch.connection.http_urllib3 import create_ssl_context
+
+    context = create_ssl_context(cafile="/certs/ca/ca.crt")
+
+
+    client = AsyncElasticsearch(
+        hosts=['elasticsearch-xpack'],
+        ssl_context=context,
+        http_auth=('elastic', 'changeme')
+    )
+
+    @asyncio.coroutine
+    def print_info():
+        info = yield from client.info()
+        print(info)
+
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(print_info())
+        loop.close()
+        client.transport.close()
+
+
+
 ``AsyncElasticsearch`` introduces one extra parameter ``loop`` which can be
 used to pass in an event loop you wish the client to use. By default
 ``asyncio.get_event_loop()`` will be used.
