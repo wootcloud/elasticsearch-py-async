@@ -12,7 +12,7 @@ f.close()
 
 install_requires = [
     'aiohttp',
-    'elasticsearch>=5.0.0',
+    'elasticsearch>=6.0.0',
 ]
 
 tests_require = [
