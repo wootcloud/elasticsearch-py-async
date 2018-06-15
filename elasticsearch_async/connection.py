@@ -2,6 +2,7 @@ import asyncio
 
 import aiohttp
 from aiohttp.client_exceptions import ServerFingerprintMismatch
+import async_timeout
 
 from elasticsearch.exceptions import ConnectionError, ConnectionTimeout, SSLError
 from elasticsearch.connection import Connection
@@ -51,7 +52,7 @@ class AIOHttpConnection(Connection):
         start = self.loop.time()
         response = None
         try:
-            with aiohttp.Timeout(timeout or self.timeout):
+            with async_timeout.timeout(timeout or self.timeout):
                 response = yield from self.session.request(method, url, data=body)
                 raw_data = yield from response.text()
             duration = self.loop.time() - start
